@@ -9,12 +9,7 @@ import SwiftUI
 import SpriteKit
 
 struct ContentView: View {
-    private var scene: SKScene {
-        let scene = SKScene(size: CGSize(width: 1, height: 1))
-        scene.scaleMode = .resizeFill
-        scene.backgroundColor = .black
-        return scene
-    }
+    @State private var scene = DotSphereScene()
 
     var body: some View {
         ZStack {
