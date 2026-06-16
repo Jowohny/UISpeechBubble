@@ -13,10 +13,10 @@ final class DotSphereScene: SKScene {
     private let dotCount = 6000
     private let glowDiameter: CGFloat = 16
 
-    var level: CGFloat = 0
+    weak var micEngine: AudioEngine?
+    private var levelProcessor = LevelProcessor()
 
     private var points: [SIMD3<Float>] = []
-
     private var nodes: [SKSpriteNode] = []
 
     private var rotationY: CGFloat = 0
@@ -96,8 +96,19 @@ final class DotSphereScene: SKScene {
         lastUpdate = currentTime
         elapsed += dt
 
-        let breathing = 0.5 + 0.5 * sin(elapsed + 15)
+        let rawRMS = micEngine?.latestRMS ?? 0
+        let level = CGFloat(levelProcessor.process(rawRMS: rawRMS, deltaTime: dt))
+
+        let breathing = 0.5 + 0.5 * sin(elapsed * 0.8)
         let drive = max(level, CGFloat(breathing) * 0.12)
+
+        let cool = (r: CGFloat(0.55), g: CGFloat(0.68), b: CGFloat(1.00))
+        let warm = (r: CGFloat(1.00), g: CGFloat(0.50), b: CGFloat(0.20))
+        let tint = SKColor(red:   cool.r + (warm.r - cool.r) * level,
+                           green: cool.g + (warm.g - cool.g) * level,
+                           blue:  cool.b + (warm.b - cool.b) * level,
+                           alpha: 1.0)
+        let brightnessBoost = 0.5 + 0.6 * level
 
         rotationY += CGFloat(dt) * 0.5
         let tilt: CGFloat = 0.45
@@ -105,17 +116,18 @@ final class DotSphereScene: SKScene {
         let cosX = cos(tilt), sinX = sin(tilt)
 
         let baseRadius = min(size.width, size.height) * 0.32
-        let radius = baseRadius * (1 + drive * 0.26)
+        let radius = baseRadius * (1 + drive * 0.30)
         let perspective: CGFloat = 3.0
 
         for i in 0..<nodes.count {
             let p = points[i]
             var x = CGFloat(p.x), y = CGFloat(p.y), z = CGFloat(p.z)
- 
+
             let scatter = 1 + drive * 0.16 *
                 CGFloat(sin(Double(p.x) * 8 + Double(p.y) * 6 + elapsed * 6))
             x *= scatter; y *= scatter; z *= scatter
 
+            // Rotate around Y, then tilt around X.
             let x1 = x * cosY - z * sinY
             let z1 = x * sinY + z * cosY
             let y1 = y * cosX - z1 * sinX
@@ -127,8 +139,9 @@ final class DotSphereScene: SKScene {
             let node = nodes[i]
             node.position = CGPoint(x: x1 * radius * persp, y: y1 * radius * persp)
             node.zPosition = depth
-            node.setScale((0.20 + depth * 0.48) * (0.9 + drive * 0.5))
-            node.alpha = 0.07 + 0.75 * depth * depth
+            node.color = tint
+            node.setScale((0.20 + depth * 0.48) * (0.9 + drive * 0.6))
+            node.alpha = (0.07 + 0.75 * depth * depth) * brightnessBoost
         }
     }
 }
