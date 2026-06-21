@@ -2,7 +2,7 @@
 //  SphereReaction.swift
 //  UISpeechBubble
 //
-// Created by Johny Vu 6/20/26
+// Created by Johny Vu on 6/20/26
 //
 
 import simd
