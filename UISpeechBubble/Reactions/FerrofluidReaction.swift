@@ -2,6 +2,8 @@
 //  FerrofluidReaction.swift
 //  UISpeechBubble
 //
+// Created by Johny Vu 6/20/26
+//
 
 import simd
 import Foundation
