@@ -16,7 +16,15 @@ final class DotSphereScene: SKScene {
     weak var micEngine: AudioEngine?
     private var levelProcessor = LevelProcessor()
 
+    /// The active sphere movement. Swap this one line to change the whole reaction:
+    /// RandomSpotsReaction(), DissolveCloudReaction(), FerrofluidReaction(),
+    /// or LiquidCurrentsReaction(). Each lives in its own file in Reactions/.
+    var reaction: SphereReaction = RandomSpotsReaction()
+
     private var points: [SIMD3<Float>] = []
+    /// Stable per-dot random value in 0...1 (parallel to `points`), for reactions
+    /// that need per-dot variety such as dissolve.
+    private var random: [Float] = []
     private var nodes: [SKSpriteNode] = []
 
     private var rotationY: CGFloat = 0
@@ -46,6 +54,7 @@ final class DotSphereScene: SKScene {
         let increment = Double.pi * (3.0 - sqrt(5.0))
 
         points.reserveCapacity(n)
+        random.reserveCapacity(n)
         for i in 0..<n {
             let y = Double(i) * offset - 1 + offset / 2
             let r = sqrt(max(0, 1 - y * y))
@@ -53,6 +62,11 @@ final class DotSphereScene: SKScene {
             points.append(SIMD3<Float>(Float(cos(phi) * r),
                                        Float(y),
                                        Float(sin(phi) * r)))
+
+            // A cheap, stable per-dot random in 0...1: take the fractional part of
+            // a big multiple of a sine. Same value every frame for dot `i`.
+            let h = sin(Double(i) * 12.9898) * 43758.5453
+            random.append(Float(h - floor(h)))
         }
 
         let texture = Self.makeGlowTexture(diameter: glowDiameter)
@@ -120,12 +134,9 @@ final class DotSphereScene: SKScene {
         let perspective: CGFloat = 3.0
 
         for i in 0..<nodes.count {
-            let p = points[i]
-            var x = CGFloat(p.x), y = CGFloat(p.y), z = CGFloat(p.z)
-
-            let scatter = 1 + drive * 0.16 *
-                CGFloat(sin(Double(p.x) * 8 + Double(p.y) * 6 + elapsed * 6))
-            x *= scatter; y *= scatter; z *= scatter
+            // Let the active reaction move this dot, then we rotate + project it.
+            let moved = reaction.deform(point: points[i], random: random[i], level: Double(level), drive: Double(drive), time: elapsed)
+            let x = CGFloat(moved.x), y = CGFloat(moved.y), z = CGFloat(moved.z)
 
             // Rotate around Y, then tilt around X.
             let x1 = x * cosY - z * sinY

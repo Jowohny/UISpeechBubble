@@ -11,6 +11,7 @@ import Combine
 
 final class AudioEngine: ObservableObject {
 
+    /// Latest raw RMS amplitude, published on the main thread for SwiftUI.
     @Published private(set) var level: Double = 0
 
     private let engine = AVAudioEngine()
@@ -18,16 +19,22 @@ final class AudioEngine: ObservableObject {
     private var _latestRMS: Double = 0
     private var isRunning = false
 
+    /// Thread-safe accessor for the render loop (Unit 5 reads this each frame).
     var latestRMS: Double {
         lock.lock(); defer { lock.unlock() }
         return _latestRMS
     }
 
+    // MARK: Lifecycle
+
+    /// Configure the session, install the tap, and start capturing.
+    /// Safe to call when already running (no-op) or without permission (fails into idle).
     func start() {
         guard !isRunning else { return }
 
         do {
             let session = AVAudioSession.sharedInstance()
+            // .measurement disables built-in processing for a cleaner level signal.
             try session.setCategory(.record, mode: .measurement, options: [])
             try session.setActive(true)
         } catch {
@@ -38,6 +45,8 @@ final class AudioEngine: ObservableObject {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
 
+        // Guard against an invalid input format (e.g. no mic permission yet),
+        // which would otherwise throw inside installTap.
         guard format.sampleRate > 0, format.channelCount > 0 else {
             print("AudioEngine: invalid input format — is mic permission granted?")
             return
@@ -62,6 +71,7 @@ final class AudioEngine: ObservableObject {
         }
     }
 
+    /// Stop capturing and settle back to silence.
     func stop() {
         guard isRunning else { return }
         engine.inputNode.removeTap(onBus: 0)
@@ -72,12 +82,17 @@ final class AudioEngine: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false)
     }
 
+    // MARK: RMS
+
+    /// Root-mean-square amplitude of a buffer's first channel, via Accelerate.
     private static func computeRMS(_ buffer: AVAudioPCMBuffer) -> Double {
         guard let channel = buffer.floatChannelData, buffer.frameLength > 0 else { return 0 }
         var rms: Float = 0
         vDSP_rmsqv(channel[0], 1, &rms, vDSP_Length(buffer.frameLength))
         return rms.isFinite ? Double(rms) : 0
     }
+
+    // MARK: Interruptions & route changes
 
     private func registerNotifications() {
         let center = NotificationCenter.default
@@ -94,8 +109,10 @@ final class AudioEngine: ObservableObject {
 
         switch type {
         case .began:
+            // System took the audio session (e.g. phone call); pause cleanly.
             engine.pause()
         case .ended:
+            // Resume only if the system says we may.
             if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt,
                AVAudioSession.InterruptionOptions(rawValue: optRaw).contains(.shouldResume) {
                 try? AVAudioSession.sharedInstance().setActive(true)
@@ -107,6 +124,7 @@ final class AudioEngine: ObservableObject {
     }
 
     @objc private func handleRouteChange(_ note: Notification) {
+        // On a route change (headphones in/out) restart the engine if it stalled.
         guard isRunning, !engine.isRunning else { return }
         try? AVAudioSession.sharedInstance().setActive(true)
         try? engine.start()

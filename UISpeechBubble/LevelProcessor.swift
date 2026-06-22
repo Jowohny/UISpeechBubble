@@ -8,31 +8,51 @@ import Foundation
 
 struct LevelProcessor {
 
-    var riseInstance: Double = 0.02
-    var fallInstance: Double = 0.09
+    // MARK: Tunables (final feel is dialed in during Unit 7)
+
+    /// Attack time constant in seconds. Smaller = snappier rise.
+    var riseInstance: Double = 0.2
+    /// Release time constant in seconds. Smaller = snappier fall.
+    var fallInstance: Double = 0.25
+    /// Raw RMS at/below this is treated as silence (gates room hiss).
     var noiseFloor: Double = 0.008
+    /// Lower bound for the adaptive peak so quiet inputs don't get over-amplified.
     var minPeak: Double = 0.03
+    /// Per-second decay applied to the running peak so gain re-adapts when the
+    /// speaker gets quieter. Expressed as a half-life-ish multiplier per second.
     var peakDecayPerSecond: Double = 0.6
 
+    // MARK: State
+
+    /// Smoothed output in 0...1. This is what the renderer reads.
     private(set) var level: Double = 0
+    /// Decaying peak used as the normalization reference.
     private var runningPeak: Double
 
     init() {
         runningPeak = minPeak
     }
 
+    /// Advance the processor by one step.
+    /// - Parameters:
+    ///   - rawRMS: linear RMS amplitude from the mic (typically ~0...0.3 for voice).
+    ///   - deltaTime: seconds since the previous call (e.g. 1/60 at 60fps).
+    /// - Returns: the smoothed level in 0...1.
     @discardableResult
     mutating func process(rawRMS: Double, deltaTime: Double) -> Double {
         let dt = max(0, deltaTime)
         let rms = rawRMS.isFinite ? max(0, rawRMS) : 0
 
+        // 1. Noise gate.
         let gated = rms <= noiseFloor ? 0 : rms
 
+        // 2. Adaptive gain: peak rises instantly to new highs, decays slowly.
         let decay = pow(peakDecayPerSecond, dt)
         runningPeak = max(gated, runningPeak * decay)
         runningPeak = max(runningPeak, minPeak)
         let normalized = min(1, gated / runningPeak)
 
+        // 3. Snappy envelope via time-constant smoothing (frame-rate independent).
         let reactiveDirection = normalized > level ? riseInstance : fallInstance
         let coeff = reactiveDirection <= 0 ? 1 : 1 - exp(-dt / reactiveDirection)
         level += (normalized - level) * coeff
@@ -40,6 +60,7 @@ struct LevelProcessor {
 
         return level
     }
+
 
     mutating func reset() {
         level = 0
