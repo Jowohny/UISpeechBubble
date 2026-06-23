@@ -24,6 +24,10 @@ struct ContentView: View {
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        .overlay(alignment: .top) {
+            ReactionPicker(scene: scene)
+                .padding(.top, 12)
+        }
         .onAppear {
             scene.micEngine = audio
 
