@@ -14,7 +14,7 @@ import Foundation
 struct DissolveCloudReaction: SphereReaction {
 
     /// How far the cloud spreads at full volume. Bigger = looser, wider cloud.
-    var strength: Double = 0.5
+    var strength: Double = 0.4
 
     func deform(point p: SIMD3<Float>, random: Float, level: Double, drive: Double, time: TimeInterval) -> SIMD3<Float> {
         let rnd = Double(random)

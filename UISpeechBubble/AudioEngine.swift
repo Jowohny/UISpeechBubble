@@ -77,9 +77,14 @@ final class AudioEngine: ObservableObject {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         isRunning = false
+        clearLevel()
+        try? AVAudioSession.sharedInstance().setActive(false)
+    }
+
+    /// Reset the loudness to zero so the sphere returns to its idle state.
+    private func clearLevel() {
         lock.lock(); _latestRMS = 0; lock.unlock()
         DispatchQueue.main.async { self.level = 0 }
-        try? AVAudioSession.sharedInstance().setActive(false)
     }
 
     // MARK: RMS
@@ -109,8 +114,11 @@ final class AudioEngine: ObservableObject {
 
         switch type {
         case .began:
-            // System took the audio session (e.g. phone call); pause cleanly.
+            // System took the audio session (e.g. phone call); pause cleanly and
+            // clear the last level so the sphere eases back to idle instead of
+            // freezing mid-reaction.
             engine.pause()
+            clearLevel()
         case .ended:
             // Resume only if the system says we may.
             if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt,

@@ -59,9 +59,23 @@ struct ContentView: View {
         .onChange(of: permission.status) { _, status in
             if status == .granted { audio.start() } else { audio.stop() }
         }
-        // Re-check permission whenever we come back to the foreground.
+        // Manage capture across the app lifecycle.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { permission.refresh() }
+            switch phase {
+            case .active:
+                // Coming back to the foreground: the user may have changed the
+                // mic in Settings, so re-check, then resume capture if allowed.
+                permission.refresh()
+                if permission.status == .granted { audio.start() }
+            case .background:
+                // Free the mic while we're not on screen; the sphere falls back
+                // to its idle rotation until we return.
+                audio.stop()
+            case .inactive:
+                break   // transient (e.g. Control Center) — leave capture as-is
+            @unknown default:
+                break
+            }
         }
     }
 
