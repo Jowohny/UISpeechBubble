@@ -36,6 +36,9 @@ final class AudioEngine: ObservableObject {
             let session = AVAudioSession.sharedInstance()
             // .measurement disables built-in processing for a cleaner level signal.
             try session.setCategory(.record, mode: .measurement, options: [])
+            // Ask the hardware for a short input buffer to cut latency (the system
+            // rounds to the nearest size it supports). ~5ms vs the ~23ms default.
+            try session.setPreferredIOBufferDuration(0.005)
             try session.setActive(true)
         } catch {
             print("AudioEngine: session setup failed — \(error)")
@@ -52,7 +55,8 @@ final class AudioEngine: ObservableObject {
             return
         }
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        // Smaller tap buffer = fresher RMS readings (≈11ms of audio vs ≈21ms).
+        input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
             guard let self else { return }
             let rms = AudioEngine.computeRMS(buffer)
             self.lock.lock(); self._latestRMS = rms; self.lock.unlock()

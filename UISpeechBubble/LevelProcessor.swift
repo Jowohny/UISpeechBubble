@@ -10,14 +10,16 @@ struct LevelProcessor {
 
     // MARK: Tunables (final feel is dialed in during Unit 7)
 
-    /// Attack time constant in seconds. Smaller = snappier rise.
-    var riseInstance: Double = 0.2
+    /// Attack time constant in seconds. Smaller = snappier rise (peaks pop faster,
+    /// less perceived delay — but too small reintroduces frame-to-frame jitter).
+    var riseInstance: Double = 0.05
     /// Release time constant in seconds. Smaller = snappier fall.
-    var fallInstance: Double = 0.25
+    var fallInstance: Double = 0.2
     /// Raw RMS at/below this is treated as silence (gates room hiss).
-    var noiseFloor: Double = 0.008
+    var noiseFloor: Double = 0.0
     /// Lower bound for the adaptive peak so quiet inputs don't get over-amplified.
-    var minPeak: Double = 0.03
+    /// Lower = more sensitive (moderate speech reaches the top of the range sooner).
+    var minPeak: Double = 0.018
     /// Per-second decay applied to the running peak so gain re-adapts when the
     /// speaker gets quieter. Expressed as a half-life-ish multiplier per second.
     var peakDecayPerSecond: Double = 0.6

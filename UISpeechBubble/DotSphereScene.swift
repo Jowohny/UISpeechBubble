@@ -129,8 +129,11 @@ final class DotSphereScene: SKScene {
         let cosY = cos(rotationY), sinY = sin(rotationY)
         let cosX = cos(tilt), sinX = sin(tilt)
 
-        let baseRadius = min(size.width, size.height) * 0.32
-        let radius = baseRadius * (1 + drive * 0.30)
+        // Sphere size. Lower the 0.26 for a smaller circle, raise it for bigger.
+        let baseRadius = min(size.width, size.height) * 0.26
+        // How much the whole sphere swells with loudness (0.20 = up to +20%).
+        // Lower this to keep the reaction from pushing dots toward the edges.
+        let radius = baseRadius * (1 + drive * 0.20)
         let perspective: CGFloat = 3.0
 
         for i in 0..<nodes.count {
