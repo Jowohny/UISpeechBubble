@@ -55,8 +55,8 @@ final class AudioEngine: ObservableObject {
             return
         }
 
-        // Smaller tap buffer = fresher RMS readings (≈11ms of audio vs ≈21ms).
-        input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
+        // Smaller tap buffer = fresher RMS readings (≈5ms of audio vs ≈21ms default).
+        input.installTap(onBus: 0, bufferSize: 256, format: format) { [weak self] buffer, _ in
             guard let self else { return }
             let rms = AudioEngine.computeRMS(buffer)
             self.lock.lock(); self._latestRMS = rms; self.lock.unlock()

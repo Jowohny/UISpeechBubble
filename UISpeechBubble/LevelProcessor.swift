@@ -12,11 +12,13 @@ struct LevelProcessor {
 
     /// Attack time constant in seconds. Smaller = snappier rise (peaks pop faster,
     /// less perceived delay — but too small reintroduces frame-to-frame jitter).
-    var riseInstance: Double = 0.05
+    var riseInstance: Double = 0.025
     /// Release time constant in seconds. Smaller = snappier fall.
     var fallInstance: Double = 0.2
-    /// Raw RMS at/below this is treated as silence (gates room hiss).
-    var noiseFloor: Double = 0.0
+    /// Raw RMS at/below this is treated as silence (gates room hiss). Sits just under
+    /// `minPeak` so real speech still passes while ambient hiss no longer feeds the
+    /// adaptive-gain normalizer — the sphere rests fully instead of twitching when quiet.
+    var noiseFloor: Double = 0.01
     /// Lower bound for the adaptive peak so quiet inputs don't get over-amplified.
     /// Lower = more sensitive (moderate speech reaches the top of the range sooner).
     var minPeak: Double = 0.018
