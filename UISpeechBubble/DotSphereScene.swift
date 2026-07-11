@@ -13,6 +13,9 @@ final class DotSphereScene: SKScene {
     private let dotCount = 6000
     private let glowDiameter: CGFloat = 16
 
+    /// Resting "cool" dot color, and the low (silent) end of the loudness tint ramp.
+    private static let coolRGB = (r: CGFloat(0.55), g: CGFloat(0.68), b: CGFloat(1.0))
+
     weak var micEngine: AudioEngine?
     private var levelProcessor = LevelProcessor()
 
@@ -43,6 +46,12 @@ final class DotSphereScene: SKScene {
     }
 
     override func didMove(to view: SKView) {
+        // Match the display's refresh ceiling (120 on ProMotion, 60 otherwise) to cut
+        // frame quantization. SpriteKit clamps to what the hardware supports, so a 120
+        // request is harmless on a 60 Hz screen. On ProMotion iPhones, reaching 120 also
+        // needs CADisableMinimumFrameDurationOnPhone=YES in Info.plist.
+        view.preferredFramesPerSecond = view.window?.screen.maximumFramesPerSecond ?? 120
+
         if points.isEmpty {
             buildSphere()
         }
@@ -70,7 +79,7 @@ final class DotSphereScene: SKScene {
         }
 
         let texture = Self.makeGlowTexture(diameter: glowDiameter)
-        let baseColor = SKColor(red: 0.55, green: 0.68, blue: 1.0, alpha: 1.0)
+        let baseColor = SKColor(red: Self.coolRGB.r, green: Self.coolRGB.g, blue: Self.coolRGB.b, alpha: 1.0)
 
         nodes.reserveCapacity(n)
         for _ in 0..<n {
@@ -116,7 +125,7 @@ final class DotSphereScene: SKScene {
         let breathing = 0.5 + 0.5 * sin(elapsed * 0.8)
         let drive = max(level, CGFloat(breathing) * 0.12)
 
-        let cool = (r: CGFloat(0.55), g: CGFloat(0.68), b: CGFloat(1.00))
+        let cool = Self.coolRGB
         let warm = (r: CGFloat(1.00), g: CGFloat(0.50), b: CGFloat(0.20))
         let tint = SKColor(red:   cool.r + (warm.r - cool.r) * level,
                            green: cool.g + (warm.g - cool.g) * level,

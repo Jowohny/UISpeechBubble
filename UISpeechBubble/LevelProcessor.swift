@@ -12,9 +12,9 @@ struct LevelProcessor {
 
     /// Attack time constant in seconds. Smaller = snappier rise (peaks pop faster,
     /// less perceived delay — but too small reintroduces frame-to-frame jitter).
-    var riseInstance: Double = 0.025
+    var attackTime: Double = 0.025
     /// Release time constant in seconds. Smaller = snappier fall.
-    var fallInstance: Double = 0.2
+    var releaseTime: Double = 0.2
     /// Raw RMS at/below this is treated as silence (gates room hiss). Sits just under
     /// `minPeak` so real speech still passes while ambient hiss no longer feeds the
     /// adaptive-gain normalizer — the sphere rests fully instead of twitching when quiet.
@@ -57,7 +57,7 @@ struct LevelProcessor {
         let normalized = min(1, gated / runningPeak)
 
         // 3. Snappy envelope via time-constant smoothing (frame-rate independent).
-        let reactiveDirection = normalized > level ? riseInstance : fallInstance
+        let reactiveDirection = normalized > level ? attackTime : releaseTime
         let coeff = reactiveDirection <= 0 ? 1 : 1 - exp(-dt / reactiveDirection)
         level += (normalized - level) * coeff
         level = min(1, max(0, level))

@@ -11,9 +11,6 @@ import Combine
 
 final class AudioEngine: ObservableObject {
 
-    /// Latest raw RMS amplitude, published on the main thread for SwiftUI.
-    @Published private(set) var level: Double = 0
-
     private let engine = AVAudioEngine()
     private let lock = NSLock()
     private var _latestRMS: Double = 0
@@ -60,7 +57,6 @@ final class AudioEngine: ObservableObject {
             guard let self else { return }
             let rms = AudioEngine.computeRMS(buffer)
             self.lock.lock(); self._latestRMS = rms; self.lock.unlock()
-            DispatchQueue.main.async { self.level = rms }
         }
 
         engine.prepare()
@@ -88,7 +84,6 @@ final class AudioEngine: ObservableObject {
     /// Reset the loudness to zero so the sphere returns to its idle state.
     private func clearLevel() {
         lock.lock(); _latestRMS = 0; lock.unlock()
-        DispatchQueue.main.async { self.level = 0 }
     }
 
     // MARK: RMS
