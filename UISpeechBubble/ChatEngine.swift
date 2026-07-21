@@ -51,8 +51,12 @@ final class ChatEngine: ObservableObject {
             let response = try await session.respond(to: prompt)
             messages.append(ChatMessage(role: .assistant, text: response.content))
         } catch {
-            // Surface the failure in-line rather than crashing or silently dropping it.
-            messages.append(ChatMessage(role: .assistant, text: "⚠️ \(error.localizedDescription)"))
+            // The failure can arrive as a clean GenerationError enum or — as seen with a
+            // missing model — as a bridged NSError wrapping a lower ModelManagerServices
+            // error, where `localizedDescription` is the useless "…GenerationError error -1".
+            // describe() digs out whichever is real. Raw error goes to the console too.
+            print("ChatEngine send failed:", error)
+            messages.append(ChatMessage(role: .assistant, text: "⚠️ \(ChatEngine.describe(error))"))
         }
     }
 
@@ -70,6 +74,55 @@ final class ChatEngine: ObservableObject {
             return .available
         case .unavailable(let reason):
             return .unavailable(reason: describe(reason))
+        }
+    }
+
+    /// Turn any error from `respond` into a human-readable line. The model layer throws two
+    /// shapes: a clean `GenerationError` enum, or a bridged `NSError` (domain
+    /// `FoundationModels.LanguageModelSession.GenerationError`, code -1) that wraps the real
+    /// cause under `NSMultipleUnderlyingErrorsKey`. Handle both instead of trusting
+    /// `localizedDescription`, which flattens the NSError shape to "error -1".
+    private static func describe(_ error: Error) -> String {
+        if let generationError = error as? LanguageModelSession.GenerationError {
+            return describe(generationError)
+        }
+        // Descend to the deepest underlying error — that's where ModelManagerServices puts
+        // the actual reason (e.g. code 1026 when the on-device model isn't installed).
+        var root = error as NSError
+        while let deeper = root.underlyingErrors.last { root = deeper as NSError }
+        if root.domain == "ModelManagerServices.ModelManagerError" {
+            return "The on-device model isn't installed on this device yet. Turn on Apple "
+                + "Intelligence and let the model finish downloading, then try again. "
+                + "(\(root.domain) \(root.code))"
+        }
+        return "\(root.domain) \(root.code)"
+    }
+
+    /// Turn a GenerationError into a human-readable line. Each case carries a `Context`
+    /// whose `debugDescription` holds the underlying detail we'd otherwise lose to the
+    /// generic "error -1" bridge.
+    private static func describe(_ error: LanguageModelSession.GenerationError) -> String {
+        switch error {
+        case .assetsUnavailable(let c):
+            return "The on-device model's assets aren't ready yet — Apple Intelligence may still be downloading. \(c.debugDescription)"
+        case .exceededContextWindowSize(let c):
+            return "This conversation is too long for the model's context window. \(c.debugDescription)"
+        case .guardrailViolation(let c):
+            return "The request tripped the safety guardrail. \(c.debugDescription)"
+        case .unsupportedGuide(let c):
+            return "Unsupported generation guide. \(c.debugDescription)"
+        case .unsupportedLanguageOrLocale(let c):
+            return "Unsupported language or locale. \(c.debugDescription)"
+        case .decodingFailure(let c):
+            return "The model's output couldn't be decoded. \(c.debugDescription)"
+        case .rateLimited(let c):
+            return "Too many requests too quickly. \(c.debugDescription)"
+        case .concurrentRequests(let c):
+            return "The session is already handling a request. \(c.debugDescription)"
+        case .refusal(_, let c):
+            return "The model declined to answer. \(c.debugDescription)"
+        @unknown default:
+            return error.failureReason ?? error.localizedDescription
         }
     }
 
