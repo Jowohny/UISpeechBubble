@@ -22,6 +22,13 @@ final class AudioEngine: ObservableObject {
         return _latestRMS
     }
 
+    /// Optional second listener on the mic tap. iOS allows only one tap per input
+    /// bus, so anything else that needs the raw audio (the speech transcriber)
+    /// receives each buffer through here instead of installing its own tap. When
+    /// nil — the normal case — the tap does nothing but compute RMS. Called on the
+    /// audio thread, so the consumer must be cheap and thread-safe.
+    var bufferConsumer: ((AVAudioPCMBuffer) -> Void)?
+
     // MARK: Lifecycle
 
     /// Configure the session, install the tap, and start capturing.
@@ -57,6 +64,8 @@ final class AudioEngine: ObservableObject {
             guard let self else { return }
             let rms = AudioEngine.computeRMS(buffer)
             self.lock.lock(); self._latestRMS = rms; self.lock.unlock()
+            // Hand the same buffer to any second listener (e.g. the transcriber).
+            self.bufferConsumer?(buffer)
         }
 
         engine.prepare()
